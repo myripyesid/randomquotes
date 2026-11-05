@@ -45,33 +45,7 @@ Para evitar compilar y subir la imagen manualmente cada vez que cambies el códi
    * Pega el siguiente contenido (asegúrate de reemplazar `TU_USUARIO_DOCKERHUB` por tu usuario real):
 
 ```yaml
-name: Docker Image CI
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v2
-
-    - name: Docker login
-      env:
-        DOCKER_USER: ${{ secrets.DOCKERHUB_USER }}
-        DOCKER_PASS: ${{ secrets.DOCKERHUB_PASS }}
-      run: |
-        docker login -u $DOCKER_USER -p $DOCKER_PASS
-
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag TU_USUARIO_DOCKERHUB/randomquotes:latest
-
-    - name: Docker Push
-      run: docker push TU_USUARIO_DOCKERHUB/randomquotes:latest
 ```
 
 4. Haz un `git push origin main`. Al revisar la pestaña **Actions** en tu repositorio de GitHub, verás el proceso ejecutándose en verde y tu imagen quedará disponible automáticamente en Docker Hub.
