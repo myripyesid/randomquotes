@@ -1,0 +1,92 @@
+En el **Tutorial 07 (Microservicios, Réplicas, Balanceo de Carga y CI/CD)** tomaremos la aplicación `randomquotes` que acabas de construir y la convertiremos en un microservicio verdaderamente escalable y automatizado.
+
+El objetivo principal es lograr que el microservicio corra con múltiples réplicas simultáneas y que, cada vez que hagas un `git push` a tu repositorio en GitHub, la imagen se construya y publique automáticamente.
+
+---
+
+### **Paso 1: Modificar `index.js` para identificar el contenedor**
+
+Para poder comprobar que las peticiones se distribuyen entre distintas réplicas, debemos hacer que la respuesta incluya el nombre del host o contenedor que atiende la solicitud mediante la librería nativa `os`.
+
+Abre el archivo **`index.js`** en tu proyecto `randomquotes` y modifícalo de la siguiente manera:
+
+```javascript
+
+```
+
+---
+
+### **Paso 2: Probar el cambio localmente con Docker**
+
+1. Reconstruye la imagen local en tu PowerShell:
+   ```powershell
+   docker build -t randomquotes .
+   ```
+2. Inicia el contenedor en el puerto 8080:
+   ```powershell
+   docker run --rm -p 8080:80 randomquotes
+   ```
+3. Ingrese a `http://localhost:8080` en tu navegador. Deberías ver la frase junto con un código al final (por ejemplo: `... - Container Id: 4a2b3c4d5e6f`).
+
+---
+
+### **Paso 3: Automatizar la publicación con GitHub Actions (CI)**
+
+Para evitar compilar y subir la imagen manualmente cada vez que cambies el código, configuraremos una acción automatizada en GitHub:
+
+1. **Subir tu proyecto a GitHub:** Crea un repositorio en GitHub llamado `randomquotes` y sube tu código.
+2. **Configurar las credenciales de Docker Hub en GitHub:**
+   * Crea una cuenta gratuita en [Docker Hub](https://hub.docker.com/) si aún no la tienes.
+   * Ve a tu repositorio en GitHub \\(\rightarrow\\) **Settings** \\(\rightarrow\\) **Secrets and variables** \\(\rightarrow\\) **Actions** \\(\rightarrow\\) **New repository secret**.
+   * Crea un secreto llamado `DOCKERHUB_USER` con tu nombre de usuario de Docker Hub.
+   * Crea otro secreto llamado `DOCKERHUB_PASS` con tu contraseña o Token de acceso de Docker Hub.
+3. **Crear el Workflow de integración continua:**
+   * En tu proyecto local, crea la carpeta `.github/workflows/` y dentro de ella el archivo **`deploy.yml`**.
+   * Pega el siguiente contenido (asegúrate de reemplazar `TU_USUARIO_DOCKERHUB` por tu usuario real):
+
+```yaml
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Docker login
+      env:
+        DOCKER_USER: ${{ secrets.DOCKERHUB_USER }}
+        DOCKER_PASS: ${{ secrets.DOCKERHUB_PASS }}
+      run: |
+        docker login -u $DOCKER_USER -p $DOCKER_PASS
+
+    - name: Build the Docker image
+      run: docker build . --file Dockerfile --tag TU_USUARIO_DOCKERHUB/randomquotes:latest
+
+    - name: Docker Push
+      run: docker push TU_USUARIO_DOCKERHUB/randomquotes:latest
+```
+
+4. Haz un `git push origin main`. Al revisar la pestaña **Actions** en tu repositorio de GitHub, verás el proceso ejecutándose en verde y tu imagen quedará disponible automáticamente en Docker Hub.
+
+---
+
+### **Paso 4: Replicación y Balanceo de Carga (CD)**
+
+Con la imagen publicada en Docker Hub, la aplicación se puede desplegar en la nube con múltiples réplicas:
+
+* **En Docker Swarm (Servidores EC2 / VM):** Se ejecuta `sudo docker swarm init` y luego se crea el servicio con 4 réplicas usando `sudo docker service create --name randomquotes --replicas 4 -p 80:80 TU_USUARIO_DOCKERHUB/randomquotes`.
+* **En AWS ECS con Fargate:** Se crea un clúster en Elastic Container Service (ECS), se define una tarea (*Task Definition*) con la URI de la imagen y se establece el número de tareas deseadas (*Desired tasks*) en 4. Un *Application Load Balancer* (ALB) recibe el tráfico en el puerto 80 y lo distribuye entre los 4 contenedores.
+
+Al recargar la página varias veces desde el navegador o la terminal, verás que el `Container Id` cambia constantemente, demostrando que diferentes réplicas atienden las peticiones alternadamente.
+
+---
+
+💡 ¿Pudiste agregar la línea `os.hostname()` en tu `index.js` local y probarla en el navegador?
